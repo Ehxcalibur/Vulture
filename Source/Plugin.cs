@@ -26,6 +26,7 @@ namespace Luc1dShadow.Vulture
         public static ConfigEntry<bool> EnablePMCs;
         public static ConfigEntry<bool> EnableScavs;
         public static ConfigEntry<bool> EnablePScavs;
+        public static ConfigEntry<bool> EnableRaiders;
         
         public static ConfigEntry<bool> SilentApproach;
         public static ConfigEntry<float> SilentApproachDistance;
@@ -146,6 +147,8 @@ namespace Luc1dShadow.Vulture
                     new ConfigDescription("Enable for AI Scavs via Vulture", null, hidden));
                 EnablePScavs = Config.Bind("Bot Roles", "Enable for Player Scavs", false, 
                     new ConfigDescription("Enable for Player Scavs via Vulture", null, hidden));
+                EnableRaiders = Config.Bind("Bot Roles", "Enable for Raiders/Rogues", false, 
+                    new ConfigDescription("Enable for Raiders, Rogues, and Goons via Vulture", null, hidden));
 
                 // Legacy / Hidden
                 MinSquadSize = Config.Bind("Triggers", "Min Squad Size", 1, 
@@ -290,7 +293,7 @@ namespace Luc1dShadow.Vulture
                     "PmcBear",
                     "Assault"
                 };
-                BrainManager.AddCustomLayer(typeof(VultureLayer), brains, 80);
+                BrainManager.AddCustomLayer(typeof(VultureLayer), brains, 101);
                 
                 Log.LogInfo("Vulture: Layer Registered.");
 
