@@ -2663,7 +2663,7 @@
     "/home/admin571397/.nuget/packages/": {}
   },
   "project": {
-    "version": "1.0.0",
+    "version": "1.0.1",
     "restore": {
       "projectUniqueName": "/home/admin571397/Documents/Mod/Vulture/Vulture.csproj",
       "projectName": "Vulture",

@@ -7,7 +7,7 @@
   "targets": {
     ".NETStandard,Version=v2.1": {},
     ".NETStandard,Version=v2.1/": {
-      "Vulture/1.0.0": {
+      "Vulture/1.0.1": {
         "dependencies": {
           "BepInEx.Core": "5.4.21",
           "Assembly-CSharp": "0.0.0.0",
@@ -694,7 +694,7 @@
     }
   },
   "libraries": {
-    "Vulture/1.0.0": {
+    "Vulture/1.0.1": {
       "type": "project",
       "serviceable": false,
       "sha512": ""
