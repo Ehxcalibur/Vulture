@@ -1,0 +1,6 @@
+/home/admin571397/Documents/Mod/Vulture/obj/Release/netstandard2.0/Vulture.csproj.AssemblyReference.cache
+/home/admin571397/Documents/Mod/Vulture/obj/Release/netstandard2.0/PluginInfo.cs
+/home/admin571397/Documents/Mod/Vulture/obj/Release/netstandard2.0/Vulture.GeneratedMSBuildEditorConfig.editorconfig
+/home/admin571397/Documents/Mod/Vulture/obj/Release/netstandard2.0/Vulture.AssemblyInfoInputs.cache
+/home/admin571397/Documents/Mod/Vulture/obj/Release/netstandard2.0/Vulture.AssemblyInfo.cs
+/home/admin571397/Documents/Mod/Vulture/obj/Release/netstandard2.0/Vulture.csproj.CoreCompileInputs.cache
