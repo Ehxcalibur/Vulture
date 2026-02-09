@@ -14,8 +14,14 @@ namespace Luc1dShadow.Vulture
         private bool _isGreeding;
         private bool _isCreeping;
         private bool _targetIsExplosion;
+        private bool _shouldStop; // Flag to signal VultureLayer to deactivate
+        private float _idleStartTime; // Track how long we've been holding position
+        private float _maxIdleTime; // Dynamic max hold time
 
         private float _nextBaitTime;
+
+        // Public property for VultureLayer to check
+        public bool ShouldStop => _shouldStop;
 
         public VultureLogic(BotOwner botOwner) : base(botOwner)
         {
@@ -23,6 +29,9 @@ namespace Luc1dShadow.Vulture
 
         public override void Start()
         {
+            // Register this logic with the layer so it can check ShouldStop
+            VultureLayer.RegisterLogic(BotOwner, this);
+
             // Find target (re-query as Layer decided to start)
             var combatEvent = CombatSoundListener.GetNearestEvent(BotOwner.Position, MapSettings.GetEffectiveRange());
             if (combatEvent != null)
@@ -33,6 +42,9 @@ namespace Luc1dShadow.Vulture
                 _moveStartTime = Time.time;
                 _logicStartTime = Time.time;
                 _isGreeding = false;
+                
+                // Set fail-safe timeout to be slightly longer than the intended duration
+                _maxIdleTime = Plugin.AmbushDuration.Value + 30f;
                 
                 // Initialize Bait Timer
                 _nextBaitTime = Time.time + UnityEngine.Random.Range(5f, 15f); // Wait a bit before first bait
@@ -66,8 +78,10 @@ namespace Luc1dShadow.Vulture
             }
             else
             {
-                // Should not happen if Layer checked correctly, but handling anyway
+                // Layer activated but event is gone - signal to stop immediately
                 _isMoving = false;
+                _shouldStop = true;
+                if (Plugin.DebugLogging.Value) Plugin.Log.LogWarning($"[VultureLogic] {BotOwner.Profile?.Nickname ?? "Unknown"} - No combat event found on Start. Signaling stop.");
             }
         }
 
@@ -75,165 +89,185 @@ namespace Luc1dShadow.Vulture
         {
             _isMoving = false;
             BotOwner.StopMove();
+            VultureLayer.UnregisterLogic(BotOwner);
         }
 
         public override void Update(CustomLayer.ActionData data)
         {
-            // Check for Greed Mode
-            if (Plugin.LootGreed.Value && !_isGreeding && Time.time - _logicStartTime > Plugin.AmbushDuration.Value)
+            try
             {
-                 // Start Greeding
-                 _isGreeding = true;
-                 
-                 // Get the event again
-                 var combatEvent = CombatSoundListener.GetNearestEvent(BotOwner.Position, 9999f); 
-                 if (combatEvent != null)
-                 {
-                     // Push exact pos
-                      BotOwner.GoToPoint(combatEvent.Value.Position, true);
-                      BotOwner.SetPose(1f); // Stand up for the push
-                      BotOwner.Mover.SetTargetMoveSpeed(0.8f); // Fast walk / run
-                      _isMoving = true;
-                      _ambushPos = combatEvent.Value.Position; // Update target
-                      
-                      if (Plugin.DebugLogging.Value) Plugin.Log.LogInfo($"[Vulture] Bot {BotOwner.Profile.Nickname} GREEDING to {combatEvent.Value.Position}");
-                 }
-                 else 
-                 {
-                      if (Plugin.DebugLogging.Value) Plugin.Log.LogInfo($"[Vulture] Bot {BotOwner.Profile.Nickname} wanted to Greed but lost event info.");
-                 }
-            }
-            
-            // If Greeding, just let them move. 
-            // If normal ambush and moving, handle Silent Approach.
-
-            if (_isGreeding)
-            {
-                // Simple move logic for greed
-                if (!_isMoving && (BotOwner.Position - _ambushPos).sqrMagnitude < 2f)
+                // Check for Greed Mode
+                if (Plugin.LootGreed.Value && !_isGreeding && Time.time - _logicStartTime > Plugin.AmbushDuration.Value)
                 {
-                    // Arrived at greed spot
-                     if (Plugin.DebugLogging.Value) Plugin.Log.LogInfo($"[Vulture] Bot {BotOwner.Profile.Nickname} finished GREED push.");
+                     // Start Greeding
+                     _isGreeding = true;
+                     
+                     // Get the event again
+                     var combatEvent = CombatSoundListener.GetNearestEvent(BotOwner.Position, 9999f); 
+                     if (combatEvent != null)
+                     {
+                         // Push exact pos
+                          BotOwner.GoToPoint(combatEvent.Value.Position, true);
+                          BotOwner.SetPose(1f); // Stand up for the push
+                          BotOwner.Mover.SetTargetMoveSpeed(0.8f); // Fast walk / run
+                          _isMoving = true;
+                          _ambushPos = combatEvent.Value.Position; // Update target
+                          
+                          if (Plugin.DebugLogging.Value) Plugin.Log.LogInfo($"[Vulture] Bot {BotOwner.Profile.Nickname} GREEDING to {combatEvent.Value.Position}");
+                     }
+                     else 
+                     {
+                          if (Plugin.DebugLogging.Value) Plugin.Log.LogInfo($"[Vulture] Bot {BotOwner.Profile.Nickname} wanted to Greed but lost event info.");
+                     }
                 }
-                return;
-            }
-
-            if (!_isMoving)
-            {
-                // Holding Ambush Position
                 
-                // Silence Trigger during Hold: If combat has gone silent, reduce remaining ambush time
-                var combatEvent = CombatSoundListener.GetNearestEvent(BotOwner.Position, 9999f);
-                if (combatEvent != null)
+                // If Greeding, just let them move. 
+                // If normal ambush and moving, handle Silent Approach.
+
+                if (_isGreeding)
                 {
-                    float timeSinceEvent = Time.time - combatEvent.Value.Time;
-                    if (timeSinceEvent > Plugin.SilenceTriggerDuration.Value)
+                    // Simple move logic for greed
+                    if (!_isMoving && (BotOwner.Position - _ambushPos).sqrMagnitude < 2f)
                     {
-                        // Combat has gone silent - fast-forward to Greed by adjusting start time
-                        // This effectively makes the remaining ambush time = 0
-                        float remainingTime = Plugin.AmbushDuration.Value - (Time.time - _logicStartTime);
-                        if (remainingTime > 5f) // Only if significant time remaining
+                        // Arrived at greed spot
+                         if (Plugin.DebugLogging.Value) Plugin.Log.LogInfo($"[Vulture] Bot {BotOwner.Profile.Nickname} finished GREED push.");
+                    }
+                    return;
+                }
+
+                if (!_isMoving)
+                {
+                    // Check max idle time to prevent infinite holding
+                    if (!_isGreeding && Time.time - _idleStartTime > _maxIdleTime)
+                    {
+                        _shouldStop = true;
+                        if (Plugin.DebugLogging.Value) Plugin.Log.LogWarning($"[VultureLogic] {BotOwner.Profile?.Nickname ?? "Unknown"} - Max idle time ({_maxIdleTime}s) exceeded. Signaling stop.");
+                        return;
+                    }
+                    
+                    // Holding Ambush Position
+                    
+                    // Silence Trigger during Hold: If combat has gone silent, reduce remaining ambush time
+                    var combatEvent = CombatSoundListener.GetNearestEvent(BotOwner.Position, 9999f);
+                    if (combatEvent != null)
+                    {
+                        float timeSinceEvent = Time.time - combatEvent.Value.Time;
+                        if (timeSinceEvent > Plugin.SilenceTriggerDuration.Value)
                         {
-                            _logicStartTime = Time.time - Plugin.AmbushDuration.Value + 5f; // Leave 5s buffer
-                            if (Plugin.DebugLogging.Value) Plugin.Log.LogInfo($"[Vulture] {BotOwner.Profile.Nickname} SILENCE during hold - reducing ambush timer to push early.");
+                            // Combat has gone silent - fast-forward to Greed by adjusting start time
+                            // This effectively makes the remaining ambush time = 0
+                            float remainingTime = Plugin.AmbushDuration.Value - (Time.time - _logicStartTime);
+                            if (remainingTime > 5f) // Only if significant time remaining
+                            {
+                                _logicStartTime = Time.time - Plugin.AmbushDuration.Value + 5f; // Leave 5s buffer
+                                if (Plugin.DebugLogging.Value) Plugin.Log.LogInfo($"[Vulture] {BotOwner.Profile.Nickname} SILENCE during hold - reducing ambush timer to push early.");
+                            }
                         }
                     }
-                }
-                
-                // Handle Baiting
-                if (Plugin.EnableBaiting.Value && Time.time > _nextBaitTime)
-                {
-                    _nextBaitTime = Time.time + UnityEngine.Random.Range(10f, 25f); // Cooldown
                     
-                    if (UnityEngine.Random.Range(0, 100) < Plugin.BaitingChance.Value)
+                    // Handle Baiting
+                    if (Plugin.EnableBaiting.Value && Time.time > _nextBaitTime)
                     {
-                        TryBait();
+                        _nextBaitTime = Time.time + UnityEngine.Random.Range(10f, 25f); // Cooldown
+                        
+                        if (UnityEngine.Random.Range(0, 100) < Plugin.BaitingChance.Value)
+                        {
+                            TryBait();
+                        }
                     }
+                    
+                    HandleParanoia(data);
+                    return;
                 }
                 
-                HandleParanoia(data);
-                return;
-            }
-            
-            // Dynamic Courage (Fear Factor)
-            // Check intensity in the area we are heading to (Ambush Position) or current position? 
-            // Current position is safer logic (am I in a hot zone?), but target position logic is "is it too hot to push?"
-            // Let's check intensity at our current location to simulate "suppression" or fear of nearby chaos.
-            int localIntensity = CombatSoundListener.GetEventIntensity(BotOwner.Position, 50f, 5f);
-            if (localIntensity > Plugin.CourageThreshold.Value)
-            {
-                // Too scary! Wait.
-                BotOwner.StopMove();
-                if (Plugin.DebugLogging.Value) Plugin.Log.LogInfo($"[Vulture] {BotOwner.Profile.Nickname} HESITATING. Intensity {localIntensity} > {Plugin.CourageThreshold.Value}");
-                
-                // Optional: Crouch low
-                BotOwner.SetPose(0.1f);
-                
-                // Don't proceed with movement logic this frame
-                return; 
-            }
-            else
-            {
-                // If we were stopped, resume? 
-                // GoToPoint should handle this if called again, but we might need to re-enable movement if we manually stopped it.
-                // For now, next frame will just hit the movement block below.
-            }
+                // Dynamic Courage (Fear Factor)
+                // Check intensity in the area we are heading to (Ambush Position) or current position? 
+                // Current position is safer logic (am I in a hot zone?), but target position logic is "is it too hot to push?"
+                // Let's check intensity at our current location to simulate "suppression" or fear of nearby chaos.
+                int localIntensity = CombatSoundListener.GetEventIntensity(BotOwner.Position, 50f, 5f);
+                if (localIntensity > Plugin.CourageThreshold.Value)
+                {
+                    // Too scary! Wait.
+                    BotOwner.StopMove();
+                    if (Plugin.DebugLogging.Value) Plugin.Log.LogInfo($"[Vulture] {BotOwner.Profile.Nickname} HESITATING. Intensity {localIntensity} > {Plugin.CourageThreshold.Value}");
+                    
+                    // Optional: Crouch low
+                    BotOwner.SetPose(0.1f);
+                    
+                    // Don't proceed with movement logic this frame
+                    return; 
+                }
+                else
+                {
+                    // If we were stopped, resume? 
+                    // GoToPoint should handle this if called again, but we might need to re-enable movement if we manually stopped it.
+                    // For now, next frame will just hit the movement block below.
+                }
 
-            // 1. Silent Approach (Creep last X meters)
-            if (Plugin.SilentApproach.Value)
-            {
-               // Check Silence Trigger (Post-Fight Rush)
-               // Only valid if we have a valid combat event time
-               var combatEvent = CombatSoundListener.GetNearestEvent(BotOwner.Position, 9999f);
-               bool silenceTriggered = false;
-               
-               if (combatEvent != null)
-               {
-                   float timeSinceEvent = UnityEngine.Time.time - combatEvent.Value.Time;
-                   if (timeSinceEvent > Plugin.SilenceTriggerDuration.Value)
-                   {
-                       silenceTriggered = true;
-                   }
-               }
-               
-               float distRemaining = (BotOwner.Position - _ambushPos).magnitude;
-               if (!silenceTriggered && distRemaining < Plugin.SilentApproachDistance.Value && distRemaining > 2f)
-               {
-                   BotOwner.Mover.SetTargetMoveSpeed(0.2f); 
-                   BotOwner.SetPose(0.6f); // Lower stance (not full crawl)
+                // 1. Silent Approach (Creep last X meters)
+                if (Plugin.SilentApproach.Value)
+                {
+                   // Check Silence Trigger (Post-Fight Rush)
+                   // Only valid if we have a valid combat event time
+                   var combatEvent = CombatSoundListener.GetNearestEvent(BotOwner.Position, 9999f);
+                   bool silenceTriggered = false;
                    
-                   if (!_isCreeping)
+                   if (combatEvent != null)
                    {
-                        _isCreeping = true;
-                        if (Plugin.DebugLogging.Value) Plugin.Log.LogInfo($"[Vulture] {BotOwner.Profile.Nickname} entering SILENT approach (Creep).");
+                       float timeSinceEvent = UnityEngine.Time.time - combatEvent.Value.Time;
+                       if (timeSinceEvent > Plugin.SilenceTriggerDuration.Value)
+                       {
+                           silenceTriggered = true;
+                       }
                    }
-               }
-               else if (silenceTriggered && _isCreeping)
-               {
-                   // We were creeping, but now it's been too quiet. RUSH!
-                   _isCreeping = false;
-                   BotOwner.Mover.SetTargetMoveSpeed(1.0f); // Sprint/Run
-                   BotOwner.SetPose(1.0f); // Stand up
                    
-                   if (Plugin.DebugLogging.Value) Plugin.Log.LogInfo($"[Vulture] {BotOwner.Profile.Nickname} SILENCE TRIGGERED! Switched to RUSH.");
-               }
-            }
+                   float distRemaining = (BotOwner.Position - _ambushPos).magnitude;
+                   if (!silenceTriggered && distRemaining < Plugin.SilentApproachDistance.Value && distRemaining > 2f)
+                   {
+                       BotOwner.Mover.SetTargetMoveSpeed(0.2f); 
+                       BotOwner.SetPose(0.6f); // Lower stance (not full crawl)
+                       
+                       if (!_isCreeping)
+                       {
+                            _isCreeping = true;
+                            if (Plugin.DebugLogging.Value) Plugin.Log.LogInfo($"[Vulture] {BotOwner.Profile.Nickname} entering SILENT approach (Creep).");
+                       }
+                   }
+                   else if (silenceTriggered && _isCreeping)
+                   {
+                       // We were creeping, but now it's been too quiet. RUSH!
+                       _isCreeping = false;
+                       BotOwner.Mover.SetTargetMoveSpeed(1.0f); // Sprint/Run
+                       BotOwner.SetPose(1.0f); // Stand up
+                       
+                       if (Plugin.DebugLogging.Value) Plugin.Log.LogInfo($"[Vulture] {BotOwner.Profile.Nickname} SILENCE TRIGGERED! Switched to RUSH.");
+                   }
+                }
 
 
-            // Check if arrived
-            float dist = (BotOwner.Position - _ambushPos).sqrMagnitude;
-            if (dist < 2f * 2f) // 2m tolerance
-            {
-                _isMoving = false;
-                BotOwner.SetPose(0.1f); // Deep Crouch/Prone? 0.5 is good crouch.
-                if (Plugin.DebugLogging.Value)
-                     Plugin.Log.LogInfo($"[Vulture] Bot {BotOwner.Profile.Nickname} arrived at ambush point. Crouching.");
+                // Check if arrived
+                float dist = (BotOwner.Position - _ambushPos).sqrMagnitude;
+                if (dist < 2f * 2f) // 2m tolerance
+                {
+                    _isMoving = false;
+                    _idleStartTime = Time.time; // Start tracking idle time
+                    BotOwner.SetPose(0.1f); // Deep Crouch/Prone? 0.5 is good crouch.
+                    if (Plugin.DebugLogging.Value)
+                         Plugin.Log.LogInfo($"[Vulture] Bot {BotOwner.Profile.Nickname} arrived at ambush point. Crouching.");
+                }
+                
+                // Timeout if taking too long to move?
+                if (Time.time - _moveStartTime > 90f) // Increased to 90s for slow creep
+                {
+                     _isMoving = false;
+                     _shouldStop = true; // Signal layer to release control
+                     if (Plugin.DebugLogging.Value) Plugin.Log.LogWarning($"[VultureLogic] {BotOwner.Profile?.Nickname ?? "Unknown"} - Movement timeout. Signaling stop.");
+                }
             }
-            
-            // Timeout if taking too long to move?
-            if (Time.time - _moveStartTime > 90f) // Increased to 90s for slow creep
+            catch (System.Exception ex)
             {
-                 _isMoving = false; // Give up moving
+                Plugin.Log.LogError($"[VultureLogic] CRASH in Update: {ex}");
+                _shouldStop = true; // Safety exit on crash
             }
         }
 

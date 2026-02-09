@@ -133,6 +133,16 @@ namespace Luc1dShadow.Vulture
         }
 
         /// <summary>
+        /// Checks if a role is a marksman/sniper scav that should be ignored.
+        /// These are static snipers that don't indicate meaningful combat.
+        /// </summary>
+        public static bool IsMarksmanType(WildSpawnType role)
+        {
+            return role == WildSpawnType.marksman
+                || role == WildSpawnType.shooterBTR;
+        }
+
+        /// <summary>
         /// Checks if a position is within a recent boss activity zone.
         /// </summary>
         public static bool IsInBossZone(Vector3 position, float radius)
@@ -184,9 +194,18 @@ namespace Luc1dShadow.Vulture
                 float now = Time.time;
                 CleanupOldEvents();
 
-                // Check if shooter is a boss
+                // Check if shooter is a boss or marksman
                 var role = __instance.Profile.Info.Settings.Role;
                 bool isBoss = IsBossType(role);
+                bool isMarksman = IsMarksmanType(role);
+
+                // Ignore marksman/sniper scav shots - they're static snipers, not meaningful combat
+                if (isMarksman)
+                {
+                    if (Plugin.DebugLogging.Value)
+                        Plugin.Log.LogInfo($"[CombatSoundListener] Shot ignored (Marksman/Sniper Scav): {__instance.Profile.Nickname}");
+                    return;
+                }
 
                 RecentEvents.Add(new CombatEvent
                 {

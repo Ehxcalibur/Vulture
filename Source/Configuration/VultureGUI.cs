@@ -242,6 +242,19 @@ namespace Luc1dShadow.Vulture
             
             DrawSection("Dynamic Courage (Fear)");
             DrawSliderInt("Courage Threshold", Plugin.CourageThreshold, 0, 30, "", "Max shots/explosions in 5s before bot hesitates. Lower = more cautious.");
+            
+            GUILayout.Space(15);
+            
+            DrawSection("Airdrop Vulturing");
+            DrawToggle("Enable Airdrop Vulturing", Plugin.EnableAirdropVulturing, "Bots will vulture around landed airdrops");
+            if (Plugin.EnableAirdropVulturing.Value)
+            {
+                DrawSliderFloat("Detection Range", Plugin.AirdropDetectionRange, 100f, 600f, "m", "Max distance to detect airdrops");
+                DrawSliderInt("Vulture Chance", Plugin.AirdropVultureChance, 0, 100, "%", "Chance to vulture an airdrop (high-value target)");
+                DrawSliderFloat("Ambush Distance (Min)", Plugin.AirdropAmbushDistanceMin, 20f, 80f, "m", "Minimum distance to hold from airdrop crate");
+                DrawSliderFloat("Ambush Distance (Max)", Plugin.AirdropAmbushDistanceMax, 30f, 100f, "m", "Maximum distance to hold from airdrop crate");
+                DrawSliderFloat("Hold Duration", Plugin.AirdropAmbushDuration, 60f, 600f, "s", "How long to watch the airdrop for other looters");
+            }
         }
         
         private void DrawBehaviorsTab()
@@ -476,6 +489,14 @@ namespace Luc1dShadow.Vulture
             Plugin.SAINEnabled.Value = (bool)Plugin.SAINEnabled.DefaultValue;
             Plugin.SAINAggressionModifier.Value = (int)Plugin.SAINAggressionModifier.DefaultValue;
             Plugin.SAINCautiousModifier.Value = (int)Plugin.SAINCautiousModifier.DefaultValue;
+
+            // Airdrop Vulturing
+            Plugin.EnableAirdropVulturing.Value = (bool)Plugin.EnableAirdropVulturing.DefaultValue;
+            Plugin.AirdropDetectionRange.Value = (float)Plugin.AirdropDetectionRange.DefaultValue;
+            Plugin.AirdropAmbushDistanceMin.Value = (float)Plugin.AirdropAmbushDistanceMin.DefaultValue;
+            Plugin.AirdropAmbushDistanceMax.Value = (float)Plugin.AirdropAmbushDistanceMax.DefaultValue;
+            Plugin.AirdropAmbushDuration.Value = (float)Plugin.AirdropAmbushDuration.DefaultValue;
+            Plugin.AirdropVultureChance.Value = (int)Plugin.AirdropVultureChance.DefaultValue;
             
             Plugin.Log.LogInfo("[Vulture] All settings reset to defaults.");
         }

@@ -89,6 +89,14 @@ namespace Luc1dShadow.Vulture
         public static ConfigEntry<int> SAINAggressionModifier;
         public static ConfigEntry<int> SAINCautiousModifier;
 
+        // Airdrop Vulturing
+        public static ConfigEntry<bool> EnableAirdropVulturing;
+        public static ConfigEntry<float> AirdropDetectionRange;
+        public static ConfigEntry<float> AirdropAmbushDistanceMin;
+        public static ConfigEntry<float> AirdropAmbushDistanceMax;
+        public static ConfigEntry<float> AirdropAmbushDuration;
+        public static ConfigEntry<int> AirdropVultureChance;
+
         // GUI
         public static ConfigEntry<KeyCode> GUIKey;
 
@@ -210,6 +218,20 @@ namespace Luc1dShadow.Vulture
                 SAINCautiousModifier = Config.Bind("Integrations", "Cautious Mod", 20, 
                     new ConfigDescription("Reduced % chance for cautious SAIN bots (Rat, Timmy, Coward).", new AcceptableValueRange<int>(0, 100), hidden));
 
+                // Airdrop Vulturing
+                EnableAirdropVulturing = Config.Bind("2. Triggers", "Enable Airdrop Vulturing", true,
+                    new ConfigDescription("Bots will vulture around landed airdrops.", null, new ConfigurationManagerAttributes { Order = 6 }));
+                AirdropDetectionRange = Config.Bind("Triggers", "Airdrop Detection Range", 300f, 
+                    new ConfigDescription("Maximum distance bots can detect airdrops (meters).", new AcceptableValueRange<float>(100f, 600f), hidden));
+                AirdropAmbushDistanceMin = Config.Bind("Triggers", "Airdrop Ambush Min", 35f, 
+                    new ConfigDescription("Minimum distance to hold from airdrop (meters).", new AcceptableValueRange<float>(20f, 80f), hidden));
+                AirdropAmbushDistanceMax = Config.Bind("Triggers", "Airdrop Ambush Max", 50f, 
+                    new ConfigDescription("Maximum distance to hold from airdrop (meters).", new AcceptableValueRange<float>(30f, 100f), hidden));
+                AirdropAmbushDuration = Config.Bind("Triggers", "Airdrop Ambush Duration", 180f, 
+                    new ConfigDescription("How long to hold ambush position near airdrop (seconds).", new AcceptableValueRange<float>(60f, 600f), hidden));
+                AirdropVultureChance = Config.Bind("Triggers", "Airdrop Vulture Chance", 75, 
+                    new ConfigDescription("Chance % for a bot to vulture an airdrop.", new AcceptableValueRange<int>(0, 100), hidden));
+
                 // Per-Map Multipliers
                 FactoryMultiplier = Config.Bind("Maps", "Factory", 0.5f, 
                     new ConfigDescription("Detection range multiplier for Factory", new AcceptableValueRange<float>(0.1f, 3f), hidden));
@@ -300,6 +322,10 @@ namespace Luc1dShadow.Vulture
                 // Attach GUI component
                 gameObject.AddComponent<VultureGUI>();
                 Log.LogInfo("Vulture: GUI Ready.");
+
+                // Attach Airdrop Listener component
+                gameObject.AddComponent<AirdropListener>();
+                Log.LogInfo("Vulture: Airdrop Listener Ready.");
             }
             catch (System.Exception ex)
             {

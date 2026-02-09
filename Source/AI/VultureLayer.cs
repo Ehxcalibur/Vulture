@@ -13,12 +13,29 @@ namespace Luc1dShadow.Vulture
         private bool _isActive;
         private float _ambushEndTime;
         private bool _isGreeding;
+#pragma warning disable CS0414 // Field is assigned but never used - reserved for VultureLogic differentiation
+        private bool _isAirdropVulture; // True if vulturing an airdrop, false if combat vulture
+#pragma warning restore CS0414
         private float _nextPossibleVultureTime;
         private Vector3 _currentTargetPosition;
         
         // One-shot log flags to prevent spam
         private bool _loggedCombatSuppression;
         private bool _loggedDisabledByRole;
+        
+        // Static dictionary to map BotOwner to their VultureLogic for ShouldStop check
+        private static Dictionary<BotOwner, VultureLogic> _activeLogics = new Dictionary<BotOwner, VultureLogic>();
+        
+        // Public method for VultureLogic to register itself
+        public static void RegisterLogic(BotOwner bot, VultureLogic logic)
+        {
+            _activeLogics[bot] = logic;
+        }
+        
+        public static void UnregisterLogic(BotOwner bot)
+        {
+            _activeLogics.Remove(bot);
+        }
 
         // Static dictionary to share vulture targets between squad members
         // Key: Leader ProfileId, Value: Target position
@@ -37,6 +54,14 @@ namespace Luc1dShadow.Vulture
         
         public override bool IsCurrentActionEnding()
         {
+            // If VultureLogic signals it should stop, end the action
+            if (_activeLogics.TryGetValue(BotOwner, out var logic) && logic != null && logic.ShouldStop)
+            {
+                if (Plugin.DebugLogging.Value) Plugin.Log.LogInfo($"[VultureLayer] {BotOwner?.Profile?.Nickname ?? "Unknown"} - Logic signaled ShouldStop. Ending action.");
+                _isActive = false;
+                return true;
+            }
+            
             // If we are no longer active, action is ending
             return !_isActive;
         }
@@ -75,7 +100,9 @@ namespace Luc1dShadow.Vulture
                 if (Time.time < _nextPossibleVultureTime) return false;
     
                 bool hasEvents = CombatSoundListener.RecentEvents.Count > 0;
-                if (!hasEvents) return false;
+                bool hasAirdrops = Plugin.EnableAirdropVulturing.Value && AirdropListener.ActiveAirdrops.Count > 0;
+                
+                if (!hasEvents && !hasAirdrops) return false;
     
                 // CRITICAL: Combat Override
                 if (BotOwner.Memory == null) return false;
@@ -300,6 +327,43 @@ namespace Luc1dShadow.Vulture
                     return true;
                 }
     
+                // 4. Airdrop Check (if no combat event triggered)
+                if (Plugin.EnableAirdropVulturing.Value && AirdropListener.ActiveAirdrops.Count > 0)
+                {
+                    var airdrop = AirdropListener.GetNearestAirdrop(BotOwner.Position, Plugin.AirdropDetectionRange.Value);
+                    
+                    if (airdrop != null)
+                    {
+                        // Roll for airdrop vulture chance
+                        int roll = UnityEngine.Random.Range(0, 100);
+                        if (roll > Plugin.AirdropVultureChance.Value)
+                        {
+                            _nextPossibleVultureTime = Time.time + 120f; // Shorter cooldown for airdrops
+                            if (Plugin.DebugLogging.Value) 
+                                Plugin.Log.LogInfo($"[VultureLayer] {BotOwner.Profile.Nickname} decided to IGNORE airdrop (Rolled {roll} > {Plugin.AirdropVultureChance.Value}).");
+                            
+                            return false;
+                        }
+
+                        if (Plugin.DebugLogging.Value) 
+                            Plugin.Log.LogInfo($"[VultureLayer] Bot {BotOwner.Profile.Nickname} activating AIRDROP Vulture! Airdrop at {airdrop.Value.Position} dist: {Vector3.Distance(BotOwner.Position, airdrop.Value.Position)}");
+                        
+                        _isActive = true;
+                        _isAirdropVulture = true;
+                        _currentTargetPosition = airdrop.Value.Position;
+                        _ambushEndTime = Time.time + Plugin.AirdropAmbushDuration.Value;
+                        
+                        if (Plugin.SquadCoordination.Value && BotOwner.BotsGroup != null)
+                        {
+                            _squadVultureTargets[BotOwner.ProfileId] = _currentTargetPosition;
+                            if (Plugin.DebugLogging.Value && BotOwner.BotsGroup.MembersCount > 1)
+                                Plugin.Log.LogInfo($"[VultureLayer] {BotOwner.Profile.Nickname} broadcasting AIRDROP to squad.");
+                        }
+                        
+                        return true;
+                    }
+                }
+    
                 return false;
             }
             catch (Exception ex)
@@ -330,6 +394,10 @@ namespace Luc1dShadow.Vulture
         {
             _isActive = false;
             _isGreeding = false;
+            _isAirdropVulture = false;
+            
+            // Clean up logic registration
+            UnregisterLogic(BotOwner);
             
             // Remove squad vulture target when we stop
             if (BotOwner != null)
