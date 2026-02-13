@@ -5,28 +5,33 @@ using DrakiaXYZ.BigBrain.Brains;
 using Luc1dShadow.Vulture.Integration; // Add namespace
 using System.Collections.Generic;
 using UnityEngine;
+using HarmonyLib;
 
 namespace Luc1dShadow.Vulture
 {
-    [BepInPlugin("com.luc1dshadow.vulture", "Vulture", "1.0.0")]
+    [BepInPlugin("com.luc1dshadow.vulture", "Vulture", "1.0.3")]
     [BepInDependency("xyz.drakia.bigbrain", "0.3.0")]
     [BepInDependency("me.sol.sain", BepInDependency.DependencyFlags.SoftDependency)] // Load after SAIN if present
     public class Plugin : BaseUnityPlugin
     {
         public static ManualLogSource Log;
+        private const int LATEST_CONFIG_VERSION = 5;
         
         // Configuration
-        public static ConfigEntry<float> AmbushDistanceMin;
-        public static ConfigEntry<float> AmbushDistanceMax;
+
         public static ConfigEntry<float> DetectionRange;
         public static ConfigEntry<int> MinSquadSize;
         public static ConfigEntry<int> VultureChance;
         public static ConfigEntry<float> AmbushDuration;
+        public static ConfigEntry<float> AmbushTier1;
+        public static ConfigEntry<float> AmbushTier2;
+        public static ConfigEntry<float> AmbushTier3;
         
         public static ConfigEntry<bool> EnablePMCs;
         public static ConfigEntry<bool> EnableScavs;
         public static ConfigEntry<bool> EnablePScavs;
         public static ConfigEntry<bool> EnableRaiders;
+        public static ConfigEntry<bool> EnableGoons;
         
         public static ConfigEntry<bool> SilentApproach;
         public static ConfigEntry<float> SilentApproachDistance;
@@ -100,6 +105,11 @@ namespace Luc1dShadow.Vulture
         // GUI
         public static ConfigEntry<KeyCode> GUIKey;
 
+        // New Config Entries
+        public static ConfigEntry<bool> EnableBushVision;
+        public static ConfigEntry<float> BushVisionRange;
+        public static ConfigEntry<float> NearMissRadius;
+
         private void Awake()
         {
             Log = Logger;
@@ -112,34 +122,45 @@ namespace Luc1dShadow.Vulture
 
                 // General Settings
                 DebugLogging = Config.Bind("1. General", "Debug Logging", false,
-                    new ConfigDescription("Enable deeper logging for Vulture logic.", null, new ConfigurationManagerAttributes { Order = 99 }));
+                    new ConfigDescription("Enable deeper logging for Vulture logic.", null, hidden));
                 
-                EnableVoiceLines = Config.Bind("1. General", "Enable Voice Lines", true,
-                    new ConfigDescription("Bots will use voice lines like 'OnFight' or 'Suppressing' appropriately.", null, new ConfigurationManagerAttributes { Order = 98 }));
 
-                FlashlightDiscipline = Config.Bind("1. General", "Flashlight Discipline", true,
-                    new ConfigDescription("Bots will turn off flashlights/lasers while stalking.", null, new ConfigurationManagerAttributes { Order = 97 }));
 
                 // Triggers
                 BaseDetectionRange = Config.Bind("2. Triggers", "Base Detection Range", 150f,
-                    new ConfigDescription("Maximum distance bots can hear unsuppressed shots (before map multiplier).", null, new ConfigurationManagerAttributes { Order = 10 }));
+                    new ConfigDescription("Maximum distance bots can hear unsuppressed shots (before map multiplier).", null, hidden));
 
                 VultureChance = Config.Bind("2. Triggers", "Vulture Chance", 50,
-                    new ConfigDescription("Percent chance a bot will investigate a gunshot.", new AcceptableValueRange<int>(0, 100), new ConfigurationManagerAttributes { Order = 9 }));
+                    new ConfigDescription("Percent chance a bot will investigate a gunshot.", new AcceptableValueRange<int>(0, 100), hidden));
 
                 MultiShotIntensity = Config.Bind("2. Triggers", "Multi-Shot Intensity", 5,
-                    new ConfigDescription("Bonus % chance per additional shot in the same area.", new AcceptableValueRange<int>(0, 20), new ConfigurationManagerAttributes { Order = 8 }));
+                    new ConfigDescription("Bonus % chance per additional shot in the same area.", new AcceptableValueRange<int>(0, 20), hidden));
                 
                 CourageThreshold = Config.Bind("2. Triggers", "Courage Threshold (Fear)", 15,
-                    new ConfigDescription("If more than this many shots/explosions occur in 5s, the bot will hesitate/wait.", new AcceptableValueRange<int>(0, 30), new ConfigurationManagerAttributes { Order = 7 }));
+                    new ConfigDescription("If more than this many shots/explosions occur in 5s, the bot will hesitate/wait.", new AcceptableValueRange<int>(0, 30), hidden));
 
                 // Behavior
                 AmbushDuration = Config.Bind("3. Behaviors", "Ambush Duration", 90f,
-                    new ConfigDescription("How long (seconds) bots hold the ambush angle.", null, new ConfigurationManagerAttributes { Order = 20 }));
+                    new ConfigDescription("How long (seconds) bots hold the ambush angle.", null, hidden));
                 
                 SilenceTriggerDuration = Config.Bind("3. Behaviors", "Silence Trigger (Rush)", 45f,
-                    new ConfigDescription("If approaching and no shots heard for this long (seconds), bots will rush instead of creep.", null, new ConfigurationManagerAttributes { Order = 19 }));
+                    new ConfigDescription("If approaching and no shots heard for this long (seconds), bots will rush instead of creep.", null, hidden));
 
+                AmbushTier1 = Config.Bind("3. Behaviors", "Ambush Range Tier 1", 20f,
+                    new ConfigDescription("Closest distance bots aim to hold from combat. Default: 20m", new AcceptableValueRange<float>(5f, 40f), hidden));
+                AmbushTier2 = Config.Bind("3. Behaviors", "Ambush Range Tier 2", 30f,
+                    new ConfigDescription("Middle distance bots aim to hold from combat. Default: 30m", new AcceptableValueRange<float>(10f, 60f), hidden));
+                AmbushTier3 = Config.Bind("3. Behaviors", "Ambush Range Tier 3", 40f,
+                    new ConfigDescription("Furthest distance bots aim to hold from combat. Default: 40m", new AcceptableValueRange<float>(15f, 80f), hidden));
+
+                EnableBushVision = Config.Bind("3. Behaviors", "Enable Bush Vision", true,
+                    new ConfigDescription("Bots can see through foliage at close range while in Vulture mode.", null, hidden));
+
+                BushVisionRange = Config.Bind("3. Behaviors", "Bush Vision Range", 10f,
+                    new ConfigDescription("Maximum distance bots can see through bushes (meters).", new AcceptableValueRange<float>(0f, 30f), hidden));
+
+                NearMissRadius = Config.Bind("3. Behaviors", "Near Miss Sensitivity", 12f,
+                    new ConfigDescription("How close a shot must be (meters) to pull a bot out of ambush and into combat.", new AcceptableValueRange<float>(1f, 30f), hidden));
 
                 EnableExplosionDetection = Config.Bind("Triggers", "Detect Explosions", true, 
                     new ConfigDescription("Also react to grenade explosions, not just gunshots", null, hidden));
@@ -156,7 +177,9 @@ namespace Luc1dShadow.Vulture
                 EnablePScavs = Config.Bind("Bot Roles", "Enable for Player Scavs", false, 
                     new ConfigDescription("Enable for Player Scavs via Vulture", null, hidden));
                 EnableRaiders = Config.Bind("Bot Roles", "Enable for Raiders/Rogues", false, 
-                    new ConfigDescription("Enable for Raiders, Rogues, and Goons via Vulture", null, hidden));
+                    new ConfigDescription("Enable for Raiders and Rogues via Vulture", null, hidden));
+                EnableGoons = Config.Bind("Bot Roles", "Enable for Goons", false, 
+                    new ConfigDescription("Enable for the Goon Squad (Knight, BigPipe, BirdEye) via Vulture", null, hidden));
 
                 // Legacy / Hidden
                 MinSquadSize = Config.Bind("Triggers", "Min Squad Size", 1, 
@@ -167,10 +190,7 @@ namespace Luc1dShadow.Vulture
                 DetectionRange = Config.Bind("internal", "Detection Range", 150f, 
                     new ConfigDescription("Legacy detection range for migration", null, hidden));
 
-                AmbushDistanceMin = Config.Bind("Behaviors", "Ambush Min Dist", 25f, 
-                    new ConfigDescription("Minimum distance to hold from gunshot", null, hidden));
-                AmbushDistanceMax = Config.Bind("Behaviors", "Ambush Max Dist", 30f, 
-                    new ConfigDescription("Maximum distance to hold from gunshot", null, hidden));
+
                 LootGreed = Config.Bind("Behaviors", "Greed", true, 
                     new ConfigDescription("Bot will push aggressively toward combat zone after ambush", null, hidden));
                 
@@ -220,13 +240,13 @@ namespace Luc1dShadow.Vulture
 
                 // Airdrop Vulturing
                 EnableAirdropVulturing = Config.Bind("2. Triggers", "Enable Airdrop Vulturing", true,
-                    new ConfigDescription("Bots will vulture around landed airdrops.", null, new ConfigurationManagerAttributes { Order = 6 }));
+                    new ConfigDescription("Bots will vulture around landed airdrops.", null, hidden));
                 AirdropDetectionRange = Config.Bind("Triggers", "Airdrop Detection Range", 300f, 
                     new ConfigDescription("Maximum distance bots can detect airdrops (meters).", new AcceptableValueRange<float>(100f, 600f), hidden));
-                AirdropAmbushDistanceMin = Config.Bind("Triggers", "Airdrop Ambush Min", 35f, 
-                    new ConfigDescription("Minimum distance to hold from airdrop (meters).", new AcceptableValueRange<float>(20f, 80f), hidden));
-                AirdropAmbushDistanceMax = Config.Bind("Triggers", "Airdrop Ambush Max", 50f, 
-                    new ConfigDescription("Maximum distance to hold from airdrop (meters).", new AcceptableValueRange<float>(30f, 100f), hidden));
+                AirdropAmbushDistanceMin = Config.Bind("Triggers", "Airdrop Ambush Min", 20f, 
+                    new ConfigDescription("Minimum distance to hold from airdrop (meters). Default: 20m", new AcceptableValueRange<float>(20f, 80f), hidden));
+                AirdropAmbushDistanceMax = Config.Bind("Triggers", "Airdrop Ambush Max", 30f, 
+                    new ConfigDescription("Maximum distance to hold from airdrop (meters). Default: 30m", new AcceptableValueRange<float>(30f, 100f), hidden));
                 AirdropAmbushDuration = Config.Bind("Triggers", "Airdrop Ambush Duration", 180f, 
                     new ConfigDescription("How long to hold ambush position near airdrop (seconds).", new AcceptableValueRange<float>(60f, 600f), hidden));
                 AirdropVultureChance = Config.Bind("Triggers", "Airdrop Vulture Chance", 75, 
@@ -255,36 +275,6 @@ namespace Luc1dShadow.Vulture
                     new ConfigDescription("Detection range multiplier for Woods", new AcceptableValueRange<float>(0.1f, 3f), hidden));
                 
 
-                // Internal Config Version to handle migrations
-                var configVersion = Config.Bind("Internal", "ConfigVersion", 1, new ConfigDescription("Internal version tracking", null, hidden));
-
-                // Migration to Version 2 (Update defaults from 250m -> 150m)
-                if (configVersion.Value < 2)
-                {
-                    bool changed = false;
-                    
-                    if (Mathf.Abs(DetectionRange.Value - 250f) < 0.1f) 
-                    {
-                        DetectionRange.Value = 150f;
-                        Log.LogInfo("Vulture: Migrated Detection Range from 250m to 150m.");
-                        changed = true;
-                    }
-                    
-                    if (Mathf.Abs(FactoryMultiplier.Value - 0.4f) < 0.1f) 
-                    {
-                        FactoryMultiplier.Value = 0.5f;
-                        changed = true;
-                    }
-                    
-                    if (Mathf.Abs(WoodsMultiplier.Value - 1.4f) < 0.1f) 
-                    {
-                        WoodsMultiplier.Value = 2.0f;
-                        changed = true;
-                    }
-
-                    configVersion.Value = 2;
-                    if (changed) Config.Save();
-                }
 
                 // Time-of-Day Settings
                 NightTimeModifier = Config.Bind("Time", "Night Modifier", true, 
@@ -296,15 +286,21 @@ namespace Luc1dShadow.Vulture
                 GUIKey = Config.Bind("1. Vulture", "Config Menu Key", KeyCode.F7, 
                     "Press this key to open the Vulture configuration menu");
 
-                Log.LogInfo("Vulture: Config Loaded.");
-                Log.LogInfo($"Vulture Settings: Chance={VultureChance.Value}%, Range={DetectionRange.Value}m, Ambush={AmbushDuration.Value}s");
-                Log.LogInfo($"Vulture GUI: Press {GUIKey.Value} to open config menu");
+                if (Plugin.DebugLogging.Value)
+                {
+                    Log.LogInfo("Vulture: Config Loaded.");
+                    Log.LogInfo($"Vulture Settings: Chance={VultureChance.Value}%, Range={BaseDetectionRange.Value}m, Ambush={AmbushDuration.Value}s");
+                    Log.LogInfo($"Vulture GUI: Press {GUIKey.Value} to open config menu");
+                }
 
                 // Note: SAIN integration is checked lazily when the GUI is opened or a bot is processed
                 // This avoids load order issues since SAIN may load after Vulture
             
                 // Register Combat Sound Listener (gunshots + explosions)
                 new CombatSoundListener().Enable();
+
+                // Enable Vision Patches (Bush bypass)
+                Luc1dShadow.Vulture.Patches.VisionPatches.Enable();
 
                 // Register BigBrain Layer
                 // Need to cover all potential PMC brains
@@ -317,19 +313,112 @@ namespace Luc1dShadow.Vulture
                 };
                 BrainManager.AddCustomLayer(typeof(VultureLayer), brains, 101);
                 
-                Log.LogInfo("Vulture: Layer Registered.");
+                if (Plugin.DebugLogging.Value) Log.LogInfo("Vulture: Layer Registered.");
 
                 // Attach GUI component
                 gameObject.AddComponent<VultureGUI>();
-                Log.LogInfo("Vulture: GUI Ready.");
+                if (Plugin.DebugLogging.Value) Log.LogInfo("Vulture: GUI Ready.");
 
                 // Attach Airdrop Listener component
                 gameObject.AddComponent<AirdropListener>();
-                Log.LogInfo("Vulture: Airdrop Listener Ready.");
+                if (Plugin.DebugLogging.Value) Log.LogInfo("Vulture: Airdrop Listener Ready.");
+                // Register Cleanup Patch
+                Harmony.CreateAndPatchAll(typeof(GameWorldDisposePatch));
+                if (Plugin.DebugLogging.Value) Log.LogInfo("Vulture: Cleanup Patch Registered.");
+
+                // Internal Config Version & Nuclear Reset (MUST BE LAST)
+                var configVersion = Config.Bind("Internal", "ConfigVersion", 1, new ConfigDescription("Internal version tracking", null, hidden));
+                if (configVersion.Value < LATEST_CONFIG_VERSION)
+                {
+                    ResetAllSettingsToDefaults();
+                    configVersion.Value = LATEST_CONFIG_VERSION;
+                    Config.Save();
+                }
             }
             catch (System.Exception ex)
             {
                 Log.LogError($"Vulture: CRITICAL ERROR in Awake: {ex}");
+            }
+        }
+
+        private void ResetAllSettingsToDefaults()
+        {
+            Log.LogWarning("Vulture: Configuration version mismatch. Resetting ALL settings to defaults.");
+
+            DebugLogging.Value = (bool)DebugLogging.DefaultValue;
+            BaseDetectionRange.Value = (float)BaseDetectionRange.DefaultValue;
+            VultureChance.Value = (int)VultureChance.DefaultValue;
+            MultiShotIntensity.Value = (int)MultiShotIntensity.DefaultValue;
+            CourageThreshold.Value = (int)CourageThreshold.DefaultValue;
+            AmbushDuration.Value = (float)AmbushDuration.DefaultValue;
+            SilenceTriggerDuration.Value = (float)SilenceTriggerDuration.DefaultValue;
+            AmbushTier1.Value = (float)AmbushTier1.DefaultValue;
+            AmbushTier2.Value = (float)AmbushTier2.DefaultValue;
+            AmbushTier3.Value = (float)AmbushTier3.DefaultValue;
+            EnableBushVision.Value = (bool)EnableBushVision.DefaultValue;
+            BushVisionRange.Value = (float)BushVisionRange.DefaultValue;
+            NearMissRadius.Value = (float)NearMissRadius.DefaultValue;
+            EnableExplosionDetection.Value = (bool)EnableExplosionDetection.DefaultValue;
+            IntensityWindow.Value = (float)IntensityWindow.DefaultValue;
+            EnablePMCs.Value = (bool)EnablePMCs.DefaultValue;
+            EnableScavs.Value = (bool)EnableScavs.DefaultValue;
+            EnablePScavs.Value = (bool)EnablePScavs.DefaultValue;
+            EnableRaiders.Value = (bool)EnableRaiders.DefaultValue;
+            EnableGoons.Value = (bool)EnableGoons.DefaultValue;
+            MinSquadSize.Value = (int)MinSquadSize.DefaultValue;
+            DetectionRange.Value = (float)DetectionRange.DefaultValue;
+            LootGreed.Value = (bool)LootGreed.DefaultValue;
+            SilentApproach.Value = (bool)SilentApproach.DefaultValue;
+            SilentApproachDistance.Value = (float)SilentApproachDistance.DefaultValue;
+            Paranoia.Value = (bool)Paranoia.DefaultValue;
+            BossAvoidance.Value = (bool)BossAvoidance.DefaultValue;
+            BossAvoidanceRadius.Value = (float)BossAvoidanceRadius.DefaultValue;
+            BossZoneDecay.Value = (float)BossZoneDecay.DefaultValue;
+            SquadCoordination.Value = (bool)SquadCoordination.DefaultValue;
+            EnableVoiceLines.Value = (bool)EnableVoiceLines.DefaultValue;
+            FlashlightDiscipline.Value = (bool)FlashlightDiscipline.DefaultValue;
+            SmartAmbush.Value = (bool)SmartAmbush.DefaultValue;
+            EnableBaiting.Value = (bool)EnableBaiting.DefaultValue;
+            BaitingChance.Value = (int)BaitingChance.DefaultValue;
+            SAINEnabled.Value = (bool)SAINEnabled.DefaultValue;
+            SAINAggressionModifier.Value = (int)SAINAggressionModifier.DefaultValue;
+            SAINCautiousModifier.Value = (int)SAINCautiousModifier.DefaultValue;
+            EnableAirdropVulturing.Value = (bool)EnableAirdropVulturing.DefaultValue;
+            AirdropDetectionRange.Value = (float)AirdropDetectionRange.DefaultValue;
+            AirdropAmbushDistanceMin.Value = (float)AirdropAmbushDistanceMin.DefaultValue;
+            AirdropAmbushDistanceMax.Value = (float)AirdropAmbushDistanceMax.DefaultValue;
+            AirdropAmbushDuration.Value = (float)AirdropAmbushDuration.DefaultValue;
+            AirdropVultureChance.Value = (int)AirdropVultureChance.DefaultValue;
+            FactoryMultiplier.Value = (float)FactoryMultiplier.DefaultValue;
+            LabsMultiplier.Value = (float)LabsMultiplier.DefaultValue;
+            InterchangeMultiplier.Value = (float)InterchangeMultiplier.DefaultValue;
+            ReserveMultiplier.Value = (float)ReserveMultiplier.DefaultValue;
+            CustomsMultiplier.Value = (float)CustomsMultiplier.DefaultValue;
+            GroundZeroMultiplier.Value = (float)GroundZeroMultiplier.DefaultValue;
+            StreetsMultiplier.Value = (float)StreetsMultiplier.DefaultValue;
+            ShorelineMultiplier.Value = (float)ShorelineMultiplier.DefaultValue;
+            LighthouseMultiplier.Value = (float)LighthouseMultiplier.DefaultValue;
+            WoodsMultiplier.Value = (float)WoodsMultiplier.DefaultValue;
+            NightTimeModifier.Value = (bool)NightTimeModifier.DefaultValue;
+            NightRangeMultiplier.Value = (float)NightRangeMultiplier.DefaultValue;
+            GUIKey.Value = (KeyCode)GUIKey.DefaultValue;
+
+            Log.LogInfo("Vulture: All settings have been reset to tactical defaults.");
+        }
+
+        private void Update()
+        {
+            Luc1dShadow.Vulture.AI.Movement.VultureNavQueue.Update();
+        }
+
+        [HarmonyPatch(typeof(EFT.GameWorld), "OnDestroy")]
+        public static class GameWorldDisposePatch
+        {
+            [HarmonyPostfix]
+            public static void Postfix()
+            {
+                VultureLayer.ClearCache();
+                CombatSoundListener.Clear();
             }
         }
     }

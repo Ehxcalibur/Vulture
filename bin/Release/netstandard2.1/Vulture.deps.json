@@ -7,11 +7,12 @@
   "targets": {
     ".NETStandard,Version=v2.1": {},
     ".NETStandard,Version=v2.1/": {
-      "Vulture/1.0.1": {
+      "Vulture/1.0.3": {
         "dependencies": {
           "BepInEx.Core": "5.4.21",
           "Assembly-CSharp": "0.0.0.0",
           "Comfort": "1.0.0.4",
+          "DissonanceVoip": "0.0.0.0",
           "DrakiaXYZ-BigBrain": "1.4.0.0"
         },
         "runtime": {
@@ -203,6 +204,14 @@
           }
         }
       },
+      "DissonanceVoip/0.0.0.0": {
+        "runtime": {
+          "DissonanceVoip.dll": {
+            "assemblyVersion": "0.0.0.0",
+            "fileVersion": "0.0.0.0"
+          }
+        }
+      },
       "DrakiaXYZ-BigBrain/1.4.0.0": {
         "runtime": {
           "DrakiaXYZ-BigBrain.dll": {
@@ -342,14 +351,6 @@
       "Unity.ProBuilder/0.0.0.0": {
         "runtime": {
           "Unity.ProBuilder.dll": {
-            "assemblyVersion": "0.0.0.0",
-            "fileVersion": "0.0.0.0"
-          }
-        }
-      },
-      "DissonanceVoip/0.0.0.0": {
-        "runtime": {
-          "DissonanceVoip.dll": {
             "assemblyVersion": "0.0.0.0",
             "fileVersion": "0.0.0.0"
           }
@@ -694,7 +695,7 @@
     }
   },
   "libraries": {
-    "Vulture/1.0.1": {
+    "Vulture/1.0.3": {
       "type": "project",
       "serviceable": false,
       "sha512": ""
@@ -821,6 +822,11 @@
       "serviceable": false,
       "sha512": ""
     },
+    "DissonanceVoip/0.0.0.0": {
+      "type": "reference",
+      "serviceable": false,
+      "sha512": ""
+    },
     "DrakiaXYZ-BigBrain/1.4.0.0": {
       "type": "reference",
       "serviceable": false,
@@ -907,11 +913,6 @@
       "sha512": ""
     },
     "Unity.ProBuilder/0.0.0.0": {
-      "type": "reference",
-      "serviceable": false,
-      "sha512": ""
-    },
-    "DissonanceVoip/0.0.0.0": {
       "type": "reference",
       "serviceable": false,
       "sha512": ""

@@ -4,6 +4,6 @@ namespace Luc1dShadow.Vulture
     {
         public const string PLUGIN_GUID = "Vulture";
         public const string PLUGIN_NAME = "Vulture";
-        public const string PLUGIN_VERSION = "1.0.1";
+        public const string PLUGIN_VERSION = "1.0.3";
     }
 }

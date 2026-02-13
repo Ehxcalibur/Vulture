@@ -4,7 +4,7 @@
     <TargetFramework>netstandard2.1</TargetFramework>
     <AssemblyName>Vulture</AssemblyName>
     <Description>Standalone AI Vulture Behavior Mod</Description>
-    <Version>1.0.1</Version>
+    <Version>1.0.3</Version>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <LangVersion>latest</LangVersion>
     <RestoreAdditionalProjectSources>
@@ -34,6 +34,9 @@
     </Reference>
     <Reference Include="Comfort">
        <HintPath>/home/admin571397/Games/escape-from-tarkov/drive_c/EFT/EscapeFromTarkov_Data/Managed/Comfort.dll</HintPath>
+    </Reference>
+    <Reference Include="DissonanceVoip">
+       <HintPath>/home/admin571397/Games/escape-from-tarkov/drive_c/EFT/EscapeFromTarkov_Data/Managed/DissonanceVoip.dll</HintPath>
     </Reference>
     <!-- Add other necessary Unity modules if needed, but NuGet usually handles them -->
   </ItemGroup>

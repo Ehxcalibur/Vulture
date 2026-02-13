@@ -14,6 +14,9 @@ namespace Luc1dShadow.Vulture.Integration
         private static Type _botComponentType;
         private static PropertyInfo _infoProperty;
         private static PropertyInfo _personalityProperty;
+        private static PropertyInfo _isInCombatProperty;
+        private static PropertyInfo _decisionProperty;
+        private static PropertyInfo _hasDecisionProperty;
         private static MethodInfo _getComponentMethod;
 
         public static bool IsSAINLoaded
@@ -49,7 +52,7 @@ namespace Luc1dShadow.Vulture.Integration
                 {
                     _isSAINLoaded = true;
                     InitializeReflection();
-                    Plugin.Log.LogInfo("[Vulture] SAIN detected! Integration enabled.");
+                    if (Plugin.DebugLogging.Value) Plugin.Log.LogInfo("[Vulture] SAIN detected! Integration enabled.");
                 }
                 else if (!found && _isSAINLoaded == null)
                 {
@@ -79,15 +82,26 @@ namespace Luc1dShadow.Vulture.Integration
 
                 if (_botComponentType != null)
                 {
+                    // BotComponent.IsInCombat
+                    _isInCombatProperty = _botComponentType.GetProperty("IsInCombat");
+
+                    // BotComponent.Decision -> SAINDecisionClass
+                    _decisionProperty = _botComponentType.GetProperty("Decision");
+                    if (_decisionProperty != null)
+                    {
+                        var decisionType = _decisionProperty.PropertyType;
+                        // SAINDecisionClass.HasDecision
+                        _hasDecisionProperty = decisionType.GetProperty("HasDecision");
+                    }
+
                     // BotComponent.Info -> SAINBotInfoClass
                     _infoProperty = _botComponentType.GetProperty("Info");
-                    
-                    // SAINBotInfoClass.Personality -> EPersonality (enum)
                     if (_infoProperty != null)
                     {
+                        // SAINBotInfoClass.Personality -> EPersonality (enum)
                         _personalityProperty = _infoProperty.PropertyType.GetProperty("Personality");
                     }
-                    
+
                     // GameObject.GetComponent<BotComponent>()
                     _getComponentMethod = typeof(GameObject).GetMethod("GetComponent", new Type[] { }).MakeGenericMethod(_botComponentType);
                 }
@@ -99,7 +113,7 @@ namespace Luc1dShadow.Vulture.Integration
                 }
                 else
                 {
-                    Plugin.Log.LogInfo("Vulture: SAIN Integration Initialized Successfully.");
+                    if (Plugin.DebugLogging.Value) Plugin.Log.LogInfo("Vulture: SAIN Integration Initialized Successfully.");
                 }
             }
             catch (Exception ex)
@@ -151,6 +165,39 @@ namespace Luc1dShadow.Vulture.Integration
         {
             if (string.IsNullOrEmpty(personality)) return false;
             return personality == "Rat" || personality == "Timmy" || personality == "Coward";
+        }
+
+        public static bool IsSAINFinishedWithBot(BotOwner botOwner)
+        {
+            if (!IsSAINLoaded || botOwner == null) return true;
+
+            try
+            {
+                var player = botOwner.GetPlayer;
+                if (player == null) return true;
+
+                var botComponent = _getComponentMethod.Invoke(player.gameObject, null);
+                if (botComponent == null) return true;
+
+                // Check IsInCombat
+                bool inCombat = (bool)_isInCombatProperty.GetValue(botComponent);
+                if (inCombat) return false;
+
+                // Check HasDecision
+                var decision = _decisionProperty.GetValue(botComponent);
+                if (decision != null && _hasDecisionProperty != null)
+                {
+                    bool hasDecision = (bool)_hasDecisionProperty.GetValue(decision);
+                    if (hasDecision) return false;
+                }
+
+                return true;
+            }
+            catch (Exception)
+            {
+                // Fallback to true on error to avoid blocking Vulture indefinitely
+                return true;
+            }
         }
     }
 }

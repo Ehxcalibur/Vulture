@@ -222,6 +222,8 @@ namespace Luc1dShadow.Vulture
             DrawToggle("Enable PMCs", Plugin.EnablePMCs, "Allow USEC/BEAR bots to vulture");
             DrawToggle("Enable Scavs", Plugin.EnableScavs, "Allow AI Scavs to vulture");
             DrawToggle("Enable Player Scavs", Plugin.EnablePScavs, "Allow Player Scavs to vulture");
+            DrawToggle("Enable Raiders/Rogues", Plugin.EnableRaiders, "Allow Raiders and Rogues to vulture");
+            DrawToggle("Enable Goon Squad", Plugin.EnableGoons, "Allow Knight, BigPipe, and BirdEye to vulture");
         }
         
         private void DrawTriggersTab()
@@ -251,8 +253,8 @@ namespace Luc1dShadow.Vulture
             {
                 DrawSliderFloat("Detection Range", Plugin.AirdropDetectionRange, 100f, 600f, "m", "Max distance to detect airdrops");
                 DrawSliderInt("Vulture Chance", Plugin.AirdropVultureChance, 0, 100, "%", "Chance to vulture an airdrop (high-value target)");
-                DrawSliderFloat("Ambush Distance (Min)", Plugin.AirdropAmbushDistanceMin, 20f, 80f, "m", "Minimum distance to hold from airdrop crate");
-                DrawSliderFloat("Ambush Distance (Max)", Plugin.AirdropAmbushDistanceMax, 30f, 100f, "m", "Maximum distance to hold from airdrop crate");
+                DrawSliderFloat("Ambush Distance (Min)", Plugin.AirdropAmbushDistanceMin, 10f, 80f, "m", $"Minimum distance from airdrop. Default: {Plugin.AirdropAmbushDistanceMin.DefaultValue}m");
+                DrawSliderFloat("Ambush Distance (Max)", Plugin.AirdropAmbushDistanceMax, 15f, 100f, "m", $"Maximum distance from airdrop. Default: {Plugin.AirdropAmbushDistanceMax.DefaultValue}m");
                 DrawSliderFloat("Hold Duration", Plugin.AirdropAmbushDuration, 60f, 600f, "s", "How long to watch the airdrop for other looters");
             }
         }
@@ -261,8 +263,17 @@ namespace Luc1dShadow.Vulture
         {
             DrawSection("Ambush");
             DrawSliderFloat("Ambush Duration", Plugin.AmbushDuration, 30f, 180f, "s", "How long to hold position");
-            DrawSliderFloat("Ambush Min Distance", Plugin.AmbushDistanceMin, 10f, 50f, "m", "Minimum distance from target");
-            DrawSliderFloat("Ambush Max Distance", Plugin.AmbushDistanceMax, 20f, 75f, "m", "Maximum distance from target");
+            
+            DrawSection("Ambush Ranges");
+            DrawSliderFloat("Tier 1 (Near)", Plugin.AmbushTier1, 5f, 40f, "m", "Closest holding range");
+            DrawSliderFloat("Tier 2 (Mid)", Plugin.AmbushTier2, 10f, 60f, "m", "Middle holding range");
+            DrawSliderFloat("Tier 3 (Far)", Plugin.AmbushTier3, 15f, 80f, "m", "Furthest holding range");
+
+            GUILayout.Space(5);
+            DrawToggle("Enable Bush Vision", Plugin.EnableBushVision, "Bots see through bushes within range while in Vulture mode.");
+            DrawSliderFloat("Bush Vision Range", Plugin.BushVisionRange, 0f, 30f, "m", "Distance at which bots can see through foliage.");
+            DrawSliderFloat("Near Miss Sensitivity", Plugin.NearMissRadius, 1f, 30f, "m", "Shot proximity to break ambush hold.");
+
             DrawSliderFloat("Silence Trigger (Rush)", Plugin.SilenceTriggerDuration, 15f, 120f, "s", "If no shots for this long, switch from creep to rush");
             
             GUILayout.Space(15);
@@ -438,9 +449,12 @@ namespace Luc1dShadow.Vulture
             Plugin.EnablePMCs.Value = (bool)Plugin.EnablePMCs.DefaultValue;
             Plugin.EnableScavs.Value = (bool)Plugin.EnableScavs.DefaultValue;
             Plugin.EnablePScavs.Value = (bool)Plugin.EnablePScavs.DefaultValue;
+            Plugin.EnableRaiders.Value = (bool)Plugin.EnableRaiders.DefaultValue;
+            Plugin.EnableGoons.Value = (bool)Plugin.EnableGoons.DefaultValue;
             
             // Triggers
             Plugin.VultureChance.Value = (int)Plugin.VultureChance.DefaultValue;
+            Plugin.BaseDetectionRange.Value = (float)Plugin.BaseDetectionRange.DefaultValue;
             Plugin.DetectionRange.Value = (float)Plugin.DetectionRange.DefaultValue;
             Plugin.MinSquadSize.Value = (int)Plugin.MinSquadSize.DefaultValue;
             Plugin.EnableExplosionDetection.Value = (bool)Plugin.EnableExplosionDetection.DefaultValue;
@@ -449,8 +463,12 @@ namespace Luc1dShadow.Vulture
             
             // Behaviors
             Plugin.AmbushDuration.Value = (float)Plugin.AmbushDuration.DefaultValue;
-            Plugin.AmbushDistanceMin.Value = (float)Plugin.AmbushDistanceMin.DefaultValue;
-            Plugin.AmbushDistanceMax.Value = (float)Plugin.AmbushDistanceMax.DefaultValue;
+            Plugin.AmbushTier1.Value = (float)Plugin.AmbushTier1.DefaultValue;
+            Plugin.AmbushTier2.Value = (float)Plugin.AmbushTier2.DefaultValue;
+            Plugin.AmbushTier3.Value = (float)Plugin.AmbushTier3.DefaultValue;
+            Plugin.EnableBushVision.Value = (bool)Plugin.EnableBushVision.DefaultValue;
+            Plugin.BushVisionRange.Value = (float)Plugin.BushVisionRange.DefaultValue;
+            Plugin.NearMissRadius.Value = (float)Plugin.NearMissRadius.DefaultValue;
             Plugin.LootGreed.Value = (bool)Plugin.LootGreed.DefaultValue;
             Plugin.SquadCoordination.Value = (bool)Plugin.SquadCoordination.DefaultValue;
             

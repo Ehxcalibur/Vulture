@@ -40,7 +40,7 @@ namespace Luc1dShadow.Vulture
         /// </summary>
         public static float GetEffectiveRange()
         {
-            return Plugin.DetectionRange.Value * GetMultiplier() * TimeSettings.GetModifier();
+            return Plugin.BaseDetectionRange.Value * GetMultiplier() * TimeSettings.GetModifier();
         }
         
         /// <summary>

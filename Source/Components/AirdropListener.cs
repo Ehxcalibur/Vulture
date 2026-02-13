@@ -32,7 +32,7 @@ namespace Luc1dShadow.Vulture
         private void Awake()
         {
             _log = Plugin.Log;
-            _log.LogInfo("[AirdropListener] Component initialized.");
+            if (Plugin.DebugLogging.Value) _log.LogInfo("[AirdropListener] Component initialized.");
             
             // Apply the Harmony patch for airdrop landing detection
             TryApplyAirdropPatch();
@@ -57,7 +57,7 @@ namespace Luc1dShadow.Vulture
                 var airdropLogicType = AccessTools.TypeByName("AirdropLogicClass");
                 if (airdropLogicType == null)
                 {
-                    Plugin.Log.LogWarning("[AirdropListener] AirdropLogicClass not found, airdrop detection disabled.");
+                    if (Plugin.DebugLogging.Value) Plugin.Log.LogWarning("[AirdropListener] AirdropLogicClass not found, airdrop detection disabled.");
                     return;
                 }
 
@@ -65,7 +65,7 @@ namespace Luc1dShadow.Vulture
                 var targetMethod = AccessTools.Method(airdropLogicType, "method_3");
                 if (targetMethod == null)
                 {
-                    Plugin.Log.LogWarning("[AirdropListener] AirdropLogicClass.method_3 not found, airdrop detection disabled.");
+                    if (Plugin.DebugLogging.Value) Plugin.Log.LogWarning("[AirdropListener] AirdropLogicClass.method_3 not found, airdrop detection disabled.");
                     return;
                 }
 
@@ -77,7 +77,7 @@ namespace Luc1dShadow.Vulture
                 harmony.Patch(targetMethod, postfix: new HarmonyMethod(postfix));
                 
                 _patchApplied = true;
-                Plugin.Log.LogInfo("[AirdropListener] Airdrop landing patch applied successfully.");
+                if (Plugin.DebugLogging.Value) Plugin.Log.LogInfo("[AirdropListener] Airdrop landing patch applied successfully.");
             }
             catch (Exception ex)
             {
@@ -174,7 +174,7 @@ namespace Luc1dShadow.Vulture
 
             ActiveAirdrops.Add(airdropEvent);
             
-            _log?.LogInfo($"[AirdropListener] Airdrop LANDED at {position}");
+            if (Plugin.DebugLogging.Value) _log?.LogInfo($"[AirdropListener] Airdrop LANDED at {position}");
         }
 
         private void CleanupOldAirdrops()

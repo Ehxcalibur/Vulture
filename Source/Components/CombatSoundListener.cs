@@ -23,7 +23,7 @@ namespace Luc1dShadow.Vulture
         {
             _log = Plugin.Log;
             Harmony.CreateAndPatchAll(typeof(GunshotListenerPatch));
-            _log.LogInfo("CombatSoundListener: Patches enabled.");
+            if (Plugin.DebugLogging.Value) _log.LogInfo("CombatSoundListener: Patches enabled.");
             
             // Subscribe to grenade explosions via game event
             SubscribeToExplosions();
@@ -39,12 +39,12 @@ namespace Luc1dShadow.Vulture
                 {
                     var handler = Singleton<BotEventHandler>.Instance;
                     handler.OnGrenadeExplosive += OnGrenadeExplosion;
-                    _log.LogInfo("CombatSoundListener: Subscribed to grenade explosions.");
+                    if (Plugin.DebugLogging.Value) _log.LogInfo("CombatSoundListener: Subscribed to grenade explosions.");
                 }
                 else
                 {
                     // Will need to subscribe later when GameWorld loads
-                    _log.LogInfo("CombatSoundListener: BotEventHandler not ready, will subscribe on first raid.");
+                    if (Plugin.DebugLogging.Value) _log.LogInfo("CombatSoundListener: BotEventHandler not ready, will subscribe on first raid.");
                 }
             }
             catch (Exception ex)
@@ -88,7 +88,8 @@ namespace Luc1dShadow.Vulture
                 Position = explosionPosition,
                 Time = now,
                 Power = 150f, // Explosions are louder than gunshots
-                IsExplosion = true
+                IsExplosion = true,
+                ShooterProfileId = playerProfileID
             });
 
             if (Plugin.DebugLogging.Value)
@@ -102,6 +103,7 @@ namespace Luc1dShadow.Vulture
             public float Power;
             public bool IsExplosion;
             public bool IsBoss;
+            public bool IsSilenced;
             public string ShooterProfileId;
         }
 
@@ -185,12 +187,6 @@ namespace Luc1dShadow.Vulture
                     Plugin.Log.LogInfo($"[CombatSoundListener] Shot fired by {__instance.Profile.Nickname} at {__instance.Position}. Silenced: {isSilenced}");
                 }
 
-                if (isSilenced)
-                {
-                    if (Plugin.DebugLogging.Value) Plugin.Log.LogInfo($"[CombatSoundListener] Shot ignored (Silenced)");
-                    return; 
-                } 
-
                 float now = Time.time;
                 CleanupOldEvents();
 
@@ -198,6 +194,16 @@ namespace Luc1dShadow.Vulture
                 var role = __instance.Profile.Info.Settings.Role;
                 bool isBoss = IsBossType(role);
                 bool isMarksman = IsMarksmanType(role);
+                
+                // Ignore shots from other Vulture bots
+                if (__instance.AIData?.BotOwner != null)
+                {
+                    if (VultureLayer.IsVulture(__instance.AIData.BotOwner))
+                    {
+                        if (Plugin.DebugLogging.Value) Plugin.Log.LogInfo($"[CombatSoundListener] Shot ignored (Shooter is Vulture): {__instance.Profile.Nickname}");
+                        return;
+                    }
+                }
 
                 // Ignore marksman/sniper scav shots - they're static snipers, not meaningful combat
                 if (isMarksman)
@@ -207,18 +213,23 @@ namespace Luc1dShadow.Vulture
                     return;
                 }
 
+                // Register all shots (including silenced). Range filtering happens in GetNearestEvent.
                 RecentEvents.Add(new CombatEvent
                 {
                     Position = __instance.Position,
                     Time = now,
-                    Power = 100f,
+                    Power = isSilenced ? 30f : 100f,
                     IsExplosion = false,
                     IsBoss = isBoss,
+                    IsSilenced = isSilenced,
                     ShooterProfileId = __instance.ProfileId
                 });
 
                 if (isBoss && Plugin.DebugLogging.Value)
                     Plugin.Log.LogInfo($"[CombatSoundListener] BOSS detected: {__instance.Profile.Nickname} ({role}) at {__instance.Position}");
+
+                if (isSilenced && Plugin.DebugLogging.Value)
+                    Plugin.Log.LogInfo($"[CombatSoundListener] Silenced shot registered (30% hearing range)");
 
                 // Also try subscribing here in case we missed the raid start
                 TrySubscribeToExplosions();
@@ -234,26 +245,58 @@ namespace Luc1dShadow.Vulture
         /// <summary>
         /// Gets the nearest combat event (shot or explosion) within range.
         /// </summary>
-        public static CombatEvent? GetNearestEvent(Vector3 botPos, float maxDist)
+        public static CombatEvent? GetNearestEvent(Vector3 botPos, float maxDist, float maxAge = MAX_AGE, string ignoreProfileId = null, BotsGroup ignoreGroup = null)
         {
             float now = Time.time;
             CombatEvent? nearest = null;
             float bestDistSq = maxDist * maxDist;
 
-            for (int i = 0; i < RecentEvents.Count; i++)
+            // Suppressed shots are audible at 30% of the effective hearing range
+            float silencedMaxDistSq = (maxDist * 0.3f) * (maxDist * 0.3f);
+
+            for (int i = RecentEvents.Count - 1; i >= 0; i--)
             {
                 var evt = RecentEvents[i];
-                if (now - evt.Time > MAX_AGE) continue;
+                if (now - evt.Time > maxAge) break;
 
+                // Squad/Self Filtering
+                if (ignoreProfileId != null && evt.ShooterProfileId == ignoreProfileId) continue;
+                if (ignoreGroup != null && !string.IsNullOrEmpty(evt.ShooterProfileId))
+                {
+                     bool isSquad = false;
+                     for (int m = 0; m < ignoreGroup.MembersCount; m++)
+                     {
+                         var member = ignoreGroup.Member(m);
+                         if (member != null && member.ProfileId == evt.ShooterProfileId)
+                         {
+                             isSquad = true;
+                             break;
+                         }
+                     }
+                     if (isSquad) continue;
+                }
+
+                // Apply reduced range for silenced shots
+                float eventMaxDistSq = evt.IsSilenced ? silencedMaxDistSq : bestDistSq;
                 float distSq = (evt.Position - botPos).sqrMagnitude;
-                if (distSq < bestDistSq)
+                if (distSq < eventMaxDistSq && distSq < bestDistSq)
                 {
                     bestDistSq = distSq;
                     nearest = evt;
                 }
             }
 
-            return nearest;
+            if (nearest != null)
+            {
+                return nearest.Value;
+            }
+
+            return null;
+        }
+
+        public static void Clear()
+        {
+            RecentEvents.Clear();
         }
 
         /// <summary>
